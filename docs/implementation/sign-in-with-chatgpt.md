@@ -21,7 +21,7 @@ Official contracts checked on 2026-10-29: [registration](https://developers.open
 
 ## Build and isolated acceptance
 
-The development base is canary **0.27.5**. The originally running server and official macOS desktop were **0.27.4**. Treat this as a server upgrade, including all intervening upstream migrations.
+The development base is canary **0.27.5**. The originally running server and official macOS desktop were **0.27.4**. Treat this as a server upgrade, including all intervening upstream migrations. The canary base no longer accepts the 0.27.4 document-sync protocol; preserving GraphQL AI queries does not make that desktop version compatible with this server. Acceptance uses a separate, unmodified official Canary desktop while retaining the installed stable app.
 
 Prerequisites: Node **22.12+ in the 22.x line**, Yarn **4.18.0**, Rust from `rust-toolchain.toml`, Docker Buildx, and sufficient memory/disk for a full source build. The Dockerfile pins Node 22.23.2 and uses the repository Rust toolchain. A source build can use tens of GB of temporary storage. The local Docker build defaults to two Rust jobs and disables release LTO to reduce memory pressure on personal Docker hosts; build arguments can override these limits.
 
@@ -42,6 +42,8 @@ docker compose -f .docker/selfhost/compose.chatgpt-test.yml up -d
 ```
 
 This separate project uses **127.0.0.1:13010**, container `affine_siwc_acceptance` and dedicated configuration, storage and PostgreSQL volumes. The migration service and application use the **same image**. Create a test AFFiNE account through its setup page. Do not mount production data into it.
+
+Both Compose examples set `AFFINE_ENV=dev` to match this canary build. This selects the release namespace accepted by official date-version Canary clients; it does **not** set `NODE_ENV=development`. The server retains its production runtime mode and self-hosted deployment type.
 
 Enable the two Copilot settings in the test server's admin configuration, or merge the following into its existing configuration file and restart only the test application:
 
@@ -82,7 +84,9 @@ Status deliberately omits tokens. Do not manually reuse an imported record: gene
 
 The existing GraphQL `currentUser.copilot.routeOptions(promptName)` and `routeTargetId` string field are unchanged. ChatGPT choices have a `ChatGPT` name prefix; the opaque target encodes the personal profile and dynamic model slug. The server checks ownership again when resolving it.
 
-Connect official desktop 0.27.4 to the isolated server at `http://localhost:13010`. Reopen its AI conversation after changing connections/defaults to refresh cached choices. The desktop retains its existing model controls; it does not gain this branch's Web login/status components. Verify with the real account:
+Desktop 0.27.4 uses `space:join`; the canary server requires `space:join-batch` with per-document subscriptions and explicitly rejects pre-0.27.5 clients. Do not bypass this version/permission guard. During acceptance, the user approved installing [official Canary 2026.10.27-canary.909](https://github.com/toeverything/AFFiNE/releases/tag/v2026.10.27-canary.909) alongside the stable app. The arm64 ZIP SHA-256 was `094dd5b10dbfb70ac16cee996eaeeef2b8c3f48bc89a34723c21225bd5da6ebb`; its macOS code signature was verified before installation as `/Applications/AFFiNE-canary.app` (bundle ID `pro.affine.canary`). The original `/Applications/AFFiNE.app` was retained.
+
+Connect a matching official Canary desktop to the isolated server at `http://127.0.0.1:13010`. Reopen its AI conversation after changing connections/defaults to refresh cached choices. The desktop retains its existing model controls; it does not gain this branch's Web login/status components. Verify with the real account:
 
 1. Discover/select a ChatGPT model, chat, summarize, translate and rewrite text.
 2. Read/edit a document through AFFiNE tools and run workspace retrieval with a separately configured index provider.
@@ -91,7 +95,7 @@ Connect official desktop 0.27.4 to the isolated server at `http://localhost:1301
 5. Disconnect/reconnect, restart only the test container and check connection persistence. Confirm quota/auth/network errors never select a different provider.
 6. Exercise explicit BYOK chat, image generation, transcription and indexing with their own configured providers.
 
-A real OAuth session and live model responses are a separate acceptance gate; offline protocol fixtures are not evidence that these live desktop scenarios passed.
+A real OAuth session and live model responses are a separate acceptance gate; offline protocol fixtures are not evidence that these live desktop scenarios passed. See the verification record for completed live checks and remaining limits.
 
 ## Automated verification
 
@@ -128,29 +132,40 @@ To stop the isolated environment, use `docker compose -f .docker/selfhost/compos
 
 Local verification on 2026-10-29–30 (Asia/Shanghai), using Node 22.23.2, Yarn 4.18.0 and Rust 1.97.1:
 
-| Check                                                   | Result                                                                                                                                                                                |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Native library tests                                    | 296 passed, 4 explicitly ignored in the unit run                                                                                                                                      |
-| ChatGPT PostgreSQL integration tests                    | Both ignored ChatGPT tests run separately: 2 passed against a disposable pgvector/PostgreSQL 16 container                                                                             |
-| OAuth helper tests                                      | 8 passed, including recovery and timeout cleanup                                                                                                                                      |
-| Backend management and desktop contract tests           | 3 passed                                                                                                                                                                              |
-| Web ChatGPT component and existing BYOK component tests | 12 passed                                                                                                                                                                             |
-| TypeScript                                              | Server, frontend core and CLI build checks passed                                                                                                                                     |
-| Static checks                                           | Changed JavaScript/TypeScript lint and formatting, Rust formatting, Prisma schema validation and Git whitespace checks passed                                                         |
-| Source bundles                                          | Web, admin, mobile, server and native binding built for the arm64 Docker image                                                                                                        |
-| Browser component QA                                    | Playwright Chromium at 1100 × 900 and 390 × 844: connection controls, model selection, disconnect/reconnect and instructions; no overflow or console errors                           |
-| Isolated Docker startup                                 | arm64 image loaded; schema and data migration service exited 0; `/info` reports self-hosted 0.27.5                                                                                    |
-| Real HTTP boundary                                      | Anonymous GET returns 401; authenticated status returns display data; browser token import, user-ID override and unknown connection management return safe 400 responses              |
-| Desktop GraphQL compatibility                           | Existing `currentUser.copilot.routeOptions` query succeeds against the running server with the unchanged result shape (empty before OAuth)                                            |
-| Container recreation                                    | Test account, enabled configuration and server host ID survive application/migration container recreation with the dedicated volumes                                                  |
-| Complete Web settings                                   | A generated demo workspace was synced to the isolated test server; Integrations displays the ChatGPT card, reads the real status endpoint and shows the current user's helper command |
+| Check                                                   | Result                                                                                                                                                                                  |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native library tests                                    | 296 passed, 4 explicitly ignored in the unit run                                                                                                                                        |
+| ChatGPT PostgreSQL integration tests                    | Both ignored ChatGPT tests run separately: 2 passed against a disposable pgvector/PostgreSQL 16 container                                                                               |
+| OAuth helper tests                                      | 8 passed, including recovery and timeout cleanup                                                                                                                                        |
+| Backend management and desktop contract tests           | 3 passed                                                                                                                                                                                |
+| Web ChatGPT component and existing BYOK component tests | 12 passed                                                                                                                                                                               |
+| TypeScript                                              | Server, frontend core and CLI build checks passed                                                                                                                                       |
+| Static checks                                           | Changed JavaScript/TypeScript lint and formatting, Rust formatting, Prisma schema validation and Git whitespace checks passed                                                           |
+| Source bundles                                          | Web, admin, mobile, server and native binding built for the arm64 Docker image                                                                                                          |
+| Browser component QA                                    | Playwright Chromium at 1100 × 900 and 390 × 844: connection controls, model selection, disconnect/reconnect and instructions; no overflow or console errors                             |
+| Isolated Docker startup                                 | arm64 image loaded; schema and data migration service exited 0; `/info` reports self-hosted 0.27.5                                                                                      |
+| Real HTTP boundary                                      | Anonymous GET returns 401; authenticated status returns display data; browser token import, user-ID override and unknown connection management return safe 400 responses                |
+| Desktop GraphQL compatibility                           | Existing `currentUser.copilot.routeOptions` query succeeds against the running server with the unchanged result shape (empty before OAuth)                                              |
+| Container recreation                                    | Test account, enabled configuration and server host ID survive application/migration container recreation with the dedicated volumes                                                    |
+| Complete Web settings                                   | A generated demo workspace was synced to the isolated test server; Integrations displays the ChatGPT card, reads the real status endpoint and shows the current user's helper command   |
+| Real OAuth and model discovery                          | Official consent, signed ID-token verification and stdin import succeeded; the server discovered 8 visible models and selected one personal connection                                  |
+| Live chat and image input                               | Chat returned the requested sentinel; a synthetic solid-red PNG was correctly identified as red                                                                                         |
+| Live structured generation                              | Mind-map action persisted a schema-validated successful result; slide-outline action produced 9 valid ND-JSON pages                                                                     |
+| Live document tools                                     | `doc_read` read a persisted demo document; `doc_create` created a disposable note; `doc_update` appended a paragraph; a second read and direct snapshot parse confirmed both paragraphs |
+| Live usage accounting                                   | All observed test usage events used `chatgpt_plan`; no other provider source was recorded                                                                                               |
+| Imported connection after container recreation          | Connection and model catalog survived recreation; subsequent image, action and tool requests succeeded                                                                                  |
+| Official Canary desktop                                 | Logged in to the isolated server, opened its synced workspace, discovered 8 ChatGPT model choices and selected one; the sent desktop request persisted `DESKTOP_CHATGPT_OK`             |
 
-Browser component QA used the real component and button library with fixture management responses. The complete built Web app and its settings entry were also checked against the isolated server using a temporary browser profile and a generated demo workspace. The Browser plugin was not available, so an isolated Playwright browser was used. These checks do not establish live OAuth or official-desktop compatibility.
+Browser component QA used the real component and button library with fixture management responses. The complete built Web app and its settings entry were also checked against the isolated server using a temporary browser profile and a generated demo workspace. The Browser plugin was not available, so an isolated Playwright browser was used. Subsequent official-desktop checks used the native computer-use interface. The Mac locked after sending the desktop request: its successful response was confirmed in the server's persisted conversation, but final visual inspection of that response and desktop document/action interactions remains pending unlock.
+
+The existing `affine_doc_loader` 0.1.9 merge guard rejects some text replacements with `source_merge: …prop:text: ambiguous_identity`. This was reproduced without a model by creating a native document and calling `updateDocWithMarkdown`. For example, replacing `SIWC_BEFORE` with `SIWC_AFTER` failed and left the body unchanged; preserving the first paragraph and appending `SIWC_AFTER` succeeded, with both paragraphs verified in the persisted snapshot. This branch retains the guard. The pre-existing `doc_update` tool currently reports this rejection as “not found”; do not interpret that message as evidence that the document disappeared, or claim arbitrary rewrites are guaranteed to merge.
 
 The locally tested image is `affine-chatgpt:local`, image ID `sha256:ec2417a2143ad166506e48414a42561ded8482206cc9ff430618e15ed883bced`. It was built from the delivery source before the documentation/validation commit, so its OCI revision label has a `-dirty` suffix. Rebuilding from the committed branch produces a label with the final commit. No image was published.
 
 The initial unrestricted release compilation exhausted the 8 GB Docker VM's memory. An existing unrelated container was OOM-killed and restarted, and the running AFFiNE container also restarted during that attempt. No production configuration, image or data was intentionally changed. The build now limits Rust jobs and disables LTO; the bounded arm64 build succeeded. A subsequent isolated startup check caught the required license-public-key setting; the Docker build now embeds the repository development public key and CI additionally boots a server with its migration service.
 
-Real OAuth, live ChatGPT inference, official desktop 0.27.4 end-to-end scenarios, and live checks of other provider credentials remain acceptance gates requiring the user's accounts. No production upgrade is performed by this branch. The feature CI is configured to run after push; local results must not be presented as a completed GitHub Actions run.
+Real OAuth, model discovery, live chat, image input, structured actions and persisted document tools have passed against the isolated server. Desktop 0.27.4 is incompatible with the upstream canary sync protocol; the approved alternative is the separately installed official Canary. Live calls to BYOK/image-generation/transcription/index providers were not performed because separate provider credentials were not configured; existing BYOK UI regression tests and native routing/protocol fixtures passed. File modalities not advertised by the selected model remain unavailable. No production upgrade is performed by this branch.
 
 The first GitHub Actions run ([40909867365](https://github.com/nathaniel2020/AFFiNE/actions/runs/40909867365)) passed its arm64 image build, packaged runtime check and isolated HTTP/GraphQL smoke test. Its verification job passed all 296 Rust tests but stopped at `cargo fmt` because the runner lacked `rustfmt`. The workflow now explicitly installs that component. The PostgreSQL health probe also specifies the test database and role to avoid misleading authentication messages.
+
+The next GitHub Actions run ([40966067459](https://github.com/nathaniel2020/AFFiNE/actions/runs/40966067459), commit `424fdd8036cdfb096940413c0a9508e5c57e901c`) completed successfully in **both** jobs: automated verification and full arm64 source-image build plus isolated startup smoke test. Later helper-timeout and Compose-channel changes receive a new run on push; this successful run must not be represented as testing a later SHA.

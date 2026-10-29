@@ -3,6 +3,11 @@ services:
   affine:
     image: ${AFFINE_CHATGPT_IMAGE:-affine-chatgpt:local}
     pull_policy: never
+    environment:
+      # This branch builds canary; official date-version clients require dev.
+      AFFINE_ENV: dev
   affine_migration:
     image: ${AFFINE_CHATGPT_IMAGE:-affine-chatgpt:local}
     pull_policy: never
+    environment:
+      AFFINE_ENV: dev

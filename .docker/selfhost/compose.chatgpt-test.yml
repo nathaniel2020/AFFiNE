@@ -8,6 +8,8 @@ services:
     ports: ['127.0.0.1:13010:3010']
     environment: &environment
       DEPLOYMENT_TYPE: selfhosted
+      # Match the canary source build and accept official date-version clients.
+      AFFINE_ENV: dev
       DATABASE_URL: postgresql://affine:isolated-test-only@postgres:5432/affine
       REDIS_SERVER_HOST: redis
     volumes: &volumes
