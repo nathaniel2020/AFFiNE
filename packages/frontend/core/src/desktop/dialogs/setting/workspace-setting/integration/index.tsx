@@ -14,6 +14,7 @@ import {
 
 import { CALENDAR_INTEGRATION_SCROLL_ANCHOR } from '../../navigation-constants';
 import { SubPageProvider, useSubPageIsland } from '../../sub-page';
+import { ChatgptSetting } from '../chatgpt';
 import {
   IntegrationCard,
   IntegrationCardContent,
@@ -78,6 +79,7 @@ export const IntegrationSetting = ({
           </>
         }
       />
+      {isCloudWorkspace ? <ChatgptSetting /> : null}
       <ul className={list}>
         {integrationList.map(item => {
           const title =

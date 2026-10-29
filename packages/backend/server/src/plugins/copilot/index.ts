@@ -12,6 +12,7 @@ import { StorageModule } from '../../core/storage';
 import { WorkspaceModule } from '../../core/workspaces';
 import { IndexerModule } from '../indexer';
 import { CopilotAttachmentController } from './attachment-controller';
+import { ChatgptController } from './chatgpt/controller';
 import { CopilotController } from './controller';
 import { CopilotFeatureGuard, CopilotFeatureService } from './feature';
 import { WorkspaceMcpController } from './mcp/controller';
@@ -86,6 +87,7 @@ export class CopilotApiModule {}
   controllers: [
     CopilotAttachmentController,
     CopilotController,
+    ChatgptController,
     WorkspaceMcpController,
   ],
 })

@@ -34,6 +34,7 @@ import type { ListSessionOptions, UpdateChatSession } from '../../models';
 import { llmGetBuiltInRouteOptions } from '../../native';
 import { CopilotAccessService, type CopilotScopeMode } from './access';
 import { ByokEntitlementPolicy } from './byok';
+import { ChatgptService } from './chatgpt/service';
 import { CompatHistoryProjector } from './compat/history-projector';
 import { ConversationInboxService } from './conversation/inbox';
 import { CopilotEnabled } from './feature';
@@ -363,7 +364,8 @@ export class CopilotResolver {
     private readonly chatSession: ChatSessionService,
     private readonly historyProjector: CompatHistoryProjector,
     private readonly inbox: ConversationInboxService,
-    private readonly entitlement: ByokEntitlementPolicy
+    private readonly entitlement: ByokEntitlementPolicy,
+    private readonly chatgpt: ChatgptService
   ) {}
 
   @ResolveField(() => CopilotRouteOptionsType, {
@@ -378,7 +380,7 @@ export class CopilotResolver {
     const options = llmGetBuiltInRouteOptions(promptName);
     if (!options) return null;
     if (env.selfhosted) {
-      return { routeId: options.routeId, defaultTargetId: null, choices: [] };
+      return await this.chatgpt.routeOptions(user.id, options.routeId);
     }
     const premium = await this.entitlement.hasAiPlan(user.id);
     return {
