@@ -7,6 +7,7 @@ export const AUTH = 'https://auth.openai.com';
 export const RESOURCE = 'https://api.openai.com/v1';
 export const SCOPES =
   'openid profile email offline_access resource.invoke chatgpt.tokens.use.direct';
+export const AUTHORIZATION_TIMEOUT_MS = 15 * 60_000;
 
 export function sameState(actual, expected) {
   const a = Buffer.from(actual ?? '');
@@ -80,7 +81,14 @@ export async function signIn({
   rememberClient,
   consent,
   signal,
+  timeoutMs = AUTHORIZATION_TIMEOUT_MS,
 }) {
+  if (
+    !Number.isSafeInteger(timeoutMs) ||
+    timeoutMs <= 0 ||
+    timeoutMs > 60 * 60_000
+  )
+    throw new Error('Invalid authorization timeout');
   const state = randomBytes(32).toString('base64url');
   const nonce = randomBytes(32).toString('base64url');
   const verifier = randomBytes(48).toString('base64url');
@@ -129,7 +137,7 @@ export async function signIn({
   signal?.addEventListener('abort', cancel, { once: true });
   const timeout = setTimeout(
     () => rejectCallback(new Error('ChatGPT authorization timed out')),
-    5 * 60_000
+    timeoutMs
   );
   try {
     if (signal?.aborted) throw new Error('ChatGPT authorization cancelled');

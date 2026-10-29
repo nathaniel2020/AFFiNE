@@ -6,13 +6,14 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { signIn } from './chatgpt/oauth.mjs';
+import { AUTHORIZATION_TIMEOUT_MS, signIn } from './chatgpt/oauth.mjs';
 
 const { values } = parseArgs({
   options: {
     'user-id': { type: 'string' },
     container: { type: 'string', default: 'affine_server' },
     'profile-id': { type: 'string' },
+    'client-id': { type: 'string' },
     consent: { type: 'boolean', default: false },
     help: { type: 'boolean', default: false },
   },
@@ -20,7 +21,7 @@ const { values } = parseArgs({
 
 if (values.help || !values['user-id']) {
   console.log(
-    'Usage: node packages/backend/server/scripts/chatgpt-login.mjs --user-id <AFFiNE-user-id> [--container affine_server] [--profile-id <id>] [--consent]'
+    'Usage: node packages/backend/server/scripts/chatgpt-login.mjs --user-id <AFFiNE-user-id> [--container affine_server] [--profile-id <id>] [--client-id <issued-id-for-recovery>] [--consent]'
   );
   process.exit(values.help ? 0 : 1);
 }
@@ -82,6 +83,14 @@ async function containerCommand(action, record) {
 }
 
 try {
+  const recoveredClientId = values['client-id'];
+  if (
+    recoveredClientId &&
+    (!/^oaiapp_[A-Za-z0-9_-]+$/.test(recoveredClientId) ||
+      recoveredClientId.length > 256)
+  ) {
+    throw new Error('Recovery requires an issued OpenAI client ID');
+  }
   const { result: status } = await containerCommand('status');
   if (!status.enabled)
     throw new Error(
@@ -89,9 +98,17 @@ try {
     );
   const registration = values['profile-id']
     ? status.profiles.find(p => p.id === values['profile-id'])
-    : undefined;
+    : status.profiles.find(p => p.clientId === recoveredClientId);
   if (values['profile-id'] && !registration)
     throw new Error('Selected connection not found for this AFFiNE user');
+  if (
+    registration &&
+    recoveredClientId &&
+    registration.clientId !== recoveredClientId
+  )
+    throw new Error(
+      'Recovery client ID does not match the selected connection'
+    );
   const directory = join(homedir(), '.config/affine-chatgpt');
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const hostPath = join(directory, 'host-id');
@@ -123,9 +140,22 @@ try {
   // Public registration metadata only. No token is persisted on this computer.
   const saved =
     registration ??
-    (pending && !status.profiles.some(p => p.clientId === pending.clientId)
-      ? pending
-      : undefined);
+    (recoveredClientId
+      ? { clientId: recoveredClientId }
+      : pending && !status.profiles.some(p => p.clientId === pending.clientId)
+        ? pending
+        : undefined);
+  const rememberClient = async clientId => {
+    const temporary = `${pendingPath}.${randomUUID()}.tmp`;
+    await writeFile(temporary, JSON.stringify({ clientId }), {
+      mode: 0o600,
+      flag: 'wx',
+    });
+    await rename(temporary, pendingPath);
+  };
+  // Recover only the public registration identifier, never an old code or token.
+  if (recoveredClientId && !registration)
+    await rememberClient(recoveredClientId);
   const cancellation = new AbortController();
   process.once('SIGINT', () => cancellation.abort());
   const record = await signIn({
@@ -133,15 +163,9 @@ try {
     registration: saved,
     consent: values.consent,
     signal: cancellation.signal,
-    rememberClient: async clientId => {
-      const temporary = `${pendingPath}.${randomUUID()}.tmp`;
-      await writeFile(temporary, JSON.stringify({ clientId }), {
-        mode: 0o600,
-        flag: 'wx',
-      });
-      await rename(temporary, pendingPath);
-    },
+    rememberClient,
     openBrowser: async url => {
+      console.log('Opening the official ChatGPT sign-in page.');
       const command =
         process.platform === 'darwin'
           ? 'open'
@@ -149,6 +173,9 @@ try {
             ? 'explorer.exe'
             : 'xdg-open';
       await execute(command, [url]);
+      console.log(
+        `Waiting up to ${AUTHORIZATION_TIMEOUT_MS / 60_000} minutes for authorization. Keep this helper running until import completes.`
+      );
     },
   });
   try {

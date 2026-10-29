@@ -177,6 +177,11 @@ test('returning registration preserves identity and import generation', async ()
   });
   assert.equal(record.expected_generation, 8);
 });
+test('recovery reuses an issued client with a fresh validated login before first import', async () => {
+  const record = await flow({ registration: { clientId: 'issued' } });
+  assert.equal(record.client_id, 'issued');
+  assert.equal(record.expected_generation, -1);
+});
 test('ID token nonce, issuer, audience, expiration and returning identity are checked', async () => {
   for (const claims of [
     { nonce: 'wrong' },
@@ -205,4 +210,25 @@ test('denied authorization and cancellation close the listener without exchange'
   );
   mock.restoreAll();
   await assert.rejects(flow({ cancel: true }), /cancelled/);
+});
+test('authorization timeout closes the listener without exchanging or saving credentials', async () => {
+  let callback;
+  const requests = mock.method(globalThis, 'fetch', () => {
+    throw new Error('No token exchange expected');
+  });
+  await assert.rejects(
+    signIn({
+      hostId: 'urn:uuid:test-timeout',
+      timeoutMs: 25,
+      openBrowser: async url => {
+        callback = new URL(url).searchParams.get('redirect_uri');
+      },
+      rememberClient: async () => {
+        assert.fail('No registration received');
+      },
+    }),
+    /timed out/
+  );
+  assert.equal(requests.mock.callCount(), 0);
+  await assert.rejects(realFetch(callback));
 });
