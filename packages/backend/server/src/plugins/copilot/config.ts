@@ -44,6 +44,7 @@ declare global {
   interface AppConfigSchema {
     copilot: {
       enabled: boolean;
+      chatgptEnabled: ConfigItem<boolean>;
       byok: {
         enabled: ConfigItem<boolean>;
         allowedProviders: ConfigItem<

@@ -11,6 +11,7 @@ pub(crate) enum ProfileSource {
   Server,
   Local,
   Managed,
+  ChatGPTPlan,
 }
 
 pub(crate) struct AuthorizedProviderProfile {
@@ -28,6 +29,7 @@ pub(crate) struct AuthorizedProviderProfile {
 pub(crate) enum CredentialRef {
   Envelope { encrypted: String, aad: Vec<u8> },
   Managed { profile_id: String },
+  ChatGPTPlan { user_id: String, profile_id: String },
 }
 
 #[derive(Clone, PartialEq, Eq)]

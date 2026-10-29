@@ -17,6 +17,12 @@ import { RuntimeEventStream } from './event-stream';
 import { BackendRuntimeSearchOperations } from './search-operations';
 
 export class BackendRuntimeOperations extends BackendRuntimeSearchOperations {
+  async chatgptCommand(userId: string, command: Record<string, unknown>) {
+    const output = await this.measured('chatgptCommand', runtime =>
+      runtime.chatgptCommand(userId, JSON.stringify(command))
+    );
+    return JSON.parse(output) as unknown;
+  }
   async listByokProfiles(workspaceId: string): Promise<ByokProfileOutput[]> {
     return await this.measured('listByokProfiles', runtime =>
       runtime.listByokProfiles(workspaceId)
@@ -100,7 +106,7 @@ export class BackendRuntimeOperations extends BackendRuntimeSearchOperations {
         type: 'route_selected' | 'route_failed' | 'usage';
         route: {
           profileId: string;
-          source: 'server' | 'local' | 'affine_cloud';
+          source: 'server' | 'local' | 'affine_cloud' | 'chatgpt_plan';
           provider: string;
           model: string;
         };

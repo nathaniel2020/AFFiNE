@@ -35,12 +35,16 @@ pub(crate) enum CredentialEnvelopeError {
 
 impl CredentialEnvelopeKey {
   pub(crate) fn derive(root_secret: &[u8]) -> Result<Self, CredentialEnvelopeError> {
+    Self::derive_domain(root_secret, INFO)
+  }
+
+  pub(crate) fn derive_domain(root_secret: &[u8], info: &[u8]) -> Result<Self, CredentialEnvelopeError> {
     if root_secret.is_empty() {
       return Err(CredentialEnvelopeError::Unavailable);
     }
     let mut key = Zeroizing::new([0_u8; 32]);
     Hkdf::<Sha256>::new(None, root_secret)
-      .expand(INFO, key.as_mut())
+      .expand(info, key.as_mut())
       .map_err(|_| CredentialEnvelopeError::Unavailable)?;
     Ok(Self(key))
   }

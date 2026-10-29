@@ -8,6 +8,7 @@ use super::{RuntimeError, RuntimeResult};
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct CopilotRuntimeConfig {
   pub(crate) enabled: bool,
+  pub(crate) chatgpt_enabled: bool,
   pub(crate) byok: CopilotByokRuntimeConfig,
   pub(crate) providers: CopilotProvidersRuntimeConfig,
 }
@@ -76,6 +77,7 @@ fn enabled_by_default() -> bool {
 #[serde(rename_all = "camelCase", default)]
 pub(crate) struct CopilotRuntimeConfigFile {
   pub(in crate::runtime) enabled: bool,
+  pub(in crate::runtime) chatgpt_enabled: bool,
   pub(in crate::runtime) byok: CopilotByokRuntimeConfig,
   pub(in crate::runtime) providers: CopilotProvidersRuntimeConfigFile,
 }
@@ -217,6 +219,7 @@ impl TryFrom<CopilotRuntimeConfigFile> for CopilotRuntimeConfig {
   fn try_from(value: CopilotRuntimeConfigFile) -> Result<Self, Self::Error> {
     Ok(Self {
       enabled: value.enabled,
+      chatgpt_enabled: value.chatgpt_enabled,
       byok: value.byok,
       providers: CopilotProvidersRuntimeConfig {
         profiles: value

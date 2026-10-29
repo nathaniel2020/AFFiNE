@@ -22,6 +22,7 @@ export declare class BackendRuntime {
   deleteByokProfile(workspaceId: string, profileId: string): Promise<boolean>
   reorderByokProfiles(input: ReorderByokProfilesInput): Promise<Array<ByokProfileOutput>>
   createByokLocalLease(input: CreateByokLocalLeaseInput): Promise<ByokLocalLeaseOutput>
+  chatgptCommand(userId: string, inputJson: string): Promise<string>
   saveAppConfig(actor: string | undefined | null, commands: Array<AppConfigCommand>): Promise<Array<string>>
   getUserQuotaStateV1(userId: string): Promise<RuntimeUserQuotaState>
   getWorkspaceQuotaStateV1(workspaceId: string): Promise<RuntimeWorkspaceQuotaState>

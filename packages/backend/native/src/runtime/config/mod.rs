@@ -140,9 +140,12 @@ impl BackendRuntimeConfig {
   }
 
   fn validated(self) -> RuntimeResult<Self> {
-    if self.copilot.enabled && self.copilot.byok.enabled && self.private_key.is_empty() {
+    if self.copilot.enabled
+      && (self.copilot.byok.enabled || self.copilot.chatgpt_enabled)
+      && self.private_key.is_empty()
+    {
       return Err(RuntimeError::invalid_state(
-        "stable crypto.privateKey is required when persistent BYOK is enabled",
+        "stable crypto.privateKey is required when persistent BYOK or ChatGPT connections are enabled",
       ));
     }
     validate_copilot_config(&self.copilot)?;

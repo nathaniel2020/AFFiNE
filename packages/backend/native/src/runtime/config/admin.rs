@@ -91,6 +91,11 @@ fn descriptors() -> Vec<AppConfigDescriptor> {
       false,
     ),
     ("providers.profiles", "The profile list for copilot providers.", true),
+    (
+      "chatgptEnabled",
+      "Enable personal Sign in with ChatGPT connections on a self-hosted server.",
+      false,
+    ),
   ]
   .into_iter()
   .map(|(key, description, internal)| {
@@ -725,6 +730,7 @@ mod tests {
         "byok.allowCustomEndpoint",
         "byok.allowPrivateEndpoint",
         "providers.profiles",
+        "chatgptEnabled",
         "storage",
       ]
     );

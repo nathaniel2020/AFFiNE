@@ -31,6 +31,7 @@ pub(super) const NATIVE_APP_CONFIG_KEYS: &[&str] = &[
   "copilot.byok.allowPrivateEndpoint",
   "copilot.byok.enabled",
   "copilot.enabled",
+  "copilot.chatgptEnabled",
   "copilot.providers.profiles",
   "copilot.storage",
   "crypto.privateKey",

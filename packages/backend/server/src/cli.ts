@@ -6,6 +6,7 @@ import { Command, CommanderError } from 'commander';
 
 import { BackendRuntimeProvider } from './core/backend-runtime';
 import { CliAppModule } from './data/app';
+import { ChatgptCommand } from './data/commands/chatgpt';
 import { CreateCommand } from './data/commands/create';
 import { CutoverCommand } from './data/commands/cutover';
 import { ImportConfigCommand } from './data/commands/import';
@@ -109,6 +110,21 @@ function buildProgram(logger: Logger) {
         logger.log(
           'Config imported; changes take effect on the next server start.'
         );
+      });
+    });
+
+  program
+    .command('chatgpt <action>')
+    .description(
+      'Manage a personal ChatGPT connection (import reads protected JSON from stdin)'
+    )
+    .requiredOption('--user-id <id>', 'AFFiNE user ID')
+    .option('--profile-id <id>', 'Saved ChatGPT connection ID')
+    .option('--model <slug>', 'Discovered model slug')
+    .option('--host-id-file <path>', 'Persistent VM host identity file')
+    .action(async (action, options) => {
+      await withCliApp(logger, async app => {
+        await app.get(ChatgptCommand).execute(action, options);
       });
     });
 

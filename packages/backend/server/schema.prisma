@@ -37,6 +37,7 @@ model User {
   mcpCredentials              McpCredential[]
   sessions                    UserSession[]
   aiSessions                  AiSession[]
+  chatgptProfiles             AiUserChatgptProfile[]
   appConfigs                  AppConfig[]
   userSnapshots               UserSnapshot[]
   createdSnapshot             Snapshot[]                     @relation("createdSnapshot")
@@ -57,6 +58,30 @@ model User {
 
   @@index([email])
   @@map("users")
+}
+
+model AiUserChatgptProfile {
+  id              String   @id @db.VarChar
+  userId          String   @map("user_id") @db.VarChar
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientId        String   @map("client_id") @db.VarChar
+  issuer          String   @db.VarChar
+  subject         String   @db.VarChar
+  email           String   @db.VarChar
+  encryptedTokens String?  @map("encrypted_tokens")
+  scopes          String[]
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz(3)
+  generation      Int      @default(0)
+  active          Boolean  @default(false)
+  status          String   @default("connected") @db.VarChar
+  models          Json     @default("[]")
+  defaultModel    String?  @map("default_model") @db.VarChar
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([userId, clientId])
+  @@index([userId, active])
+  @@map("ai_user_chatgpt_profiles")
 }
 
 model ConnectedAccount {

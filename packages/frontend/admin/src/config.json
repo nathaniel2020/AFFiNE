@@ -334,6 +334,10 @@
       "type": "Boolean",
       "desc": "Whether workspace BYOK custom endpoints may resolve to private network targets. Enabling this allows workspace owners and admins to send provider probe requests to the private network."
     },
+    "chatgptEnabled": {
+      "type": "Boolean",
+      "desc": "Enable personal Sign in with ChatGPT connections on a self-hosted server."
+    },
     "storage": {
       "type": "Object",
       "desc": "The config for the storage provider."

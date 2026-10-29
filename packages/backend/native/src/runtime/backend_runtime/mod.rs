@@ -4,6 +4,7 @@ mod auth_session;
 mod blob_access;
 mod byok;
 mod byok_api;
+mod chatgpt;
 mod config_command;
 mod constants;
 mod control_plane;
