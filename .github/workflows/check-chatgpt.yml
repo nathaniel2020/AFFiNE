@@ -20,7 +20,7 @@ jobs:
           POSTGRES_DB: affine_siwc_test
         ports: ['5432:5432']
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d affine_siwc_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 15
@@ -39,6 +39,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: '1.97.1'
+          components: rustfmt
       - run: corepack enable && yarn install --immutable
       - run: bash scripts/verify-chatgpt.sh
   image:
