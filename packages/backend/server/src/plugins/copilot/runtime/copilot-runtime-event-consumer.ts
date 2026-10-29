@@ -6,7 +6,7 @@ import { type ByokFeatureKind, ByokProviderSource } from '../byok/types';
 
 export type CopilotRuntimeRouteIdentity = {
   profileId: string;
-  source: 'server' | 'local' | 'affine_cloud';
+  source: 'server' | 'local' | 'affine_cloud' | 'chatgpt_plan';
   provider: string;
   model: string;
 };
@@ -100,9 +100,11 @@ export class CopilotRuntimeEventConsumer {
       userId: context.userId,
       provider: event.route.provider,
       providerSource:
-        event.route.source === 'server'
-          ? ByokProviderSource.Server
-          : ByokProviderSource.Local,
+        event.route.source === 'chatgpt_plan'
+          ? 'chatgpt_plan'
+          : event.route.source === 'server'
+            ? ByokProviderSource.Server
+            : ByokProviderSource.Local,
       featureKind: context.featureKind,
       model: event.route.model,
       sessionId: context.sessionId,

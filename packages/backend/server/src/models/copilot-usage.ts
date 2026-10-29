@@ -31,7 +31,7 @@ type CountRow = {
   count: number | bigint;
 };
 
-const BYOK_PROVIDER_SOURCES = ['byok_server', 'byok_local'];
+const BYOK_PROVIDER_SOURCES = ['byok_server', 'byok_local', 'chatgpt_plan'];
 const QUOTA_EXEMPT_BYOK_FEATURES = ['chat', 'action', 'image', 'transcript'];
 
 @Injectable()

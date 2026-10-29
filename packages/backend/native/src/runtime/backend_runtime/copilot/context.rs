@@ -32,6 +32,7 @@ pub(super) struct ProfileLoadInput<'a> {
   pub(super) local_lease_id: Option<&'a str>,
   pub(super) access: &'a CopilotAccessProjection,
   pub(super) managed_target_id: Option<&'a str>,
+  pub(super) explicit_byok: bool,
 }
 
 pub(super) async fn load_profiles(
@@ -40,6 +41,15 @@ pub(super) async fn load_profiles(
   input: ProfileLoadInput<'_>,
 ) -> RuntimeResult<Vec<AuthorizedProviderProfile>> {
   let mut profiles = Vec::new();
+  if let Some(user_id) = input.user_id
+    && !input.explicit_byok
+  {
+    let personal =
+      super::super::chatgpt::load_route_profiles(pool, config, user_id, input.slot, input.managed_target_id).await?;
+    if let Some(profiles) = personal {
+      return Ok(profiles);
+    }
+  }
   let policy = config.byok_policy();
   if let Some(workspace_id) = input.workspace_id
     && input.access.server_byok

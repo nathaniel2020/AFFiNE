@@ -8,11 +8,7 @@ use std::{
   time::{Duration, Instant},
 };
 
-use llm_adapter::{
-  backend::{BackendError, DefaultHttpClient},
-  core::CoreMessage,
-  router::ExecutableRequest,
-};
+use llm_adapter::{backend::BackendError, core::CoreMessage, router::ExecutableRequest};
 use llm_runtime::{
   AccumulatedToolCall, RuntimeRouteEvent, ToolCallbackRequest, ToolCallbackResponse, ToolExecutionResult,
   ToolLoopEvent, dispatch_compiled_round, run_tool_loop,
@@ -122,13 +118,14 @@ fn run_stream(
   aborted: &AtomicBool,
   deadline: Instant,
 ) -> std::result::Result<(), String> {
+  let http = super::chatgpt_http::CopilotHttpClient::new(execution.chatgpt_plan);
   let result = run_tool_loop(
     &mut messages,
     max_steps,
     |messages| {
       let mut route_events = Vec::new();
       let result = dispatch_compiled_round(
-        &DefaultHttpClient::default(),
+        &http,
         &mut execution.plan,
         messages,
         || aborted.load(Ordering::Relaxed) || Instant::now() >= deadline,

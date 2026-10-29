@@ -1,3 +1,4 @@
+mod chatgpt_http;
 mod context;
 mod dispatch;
 mod stream;
@@ -92,6 +93,7 @@ impl BackgroundEmbeddingProvider {
         local_lease_id: None,
         access: &access,
         managed_target_id: None,
+        explicit_byok: false,
       },
     )
     .await?;
@@ -176,7 +178,9 @@ fn target_from_route(authorized: &AuthorizedCopilotRoute) -> RuntimeResult<Embed
   let route_source = match profile.source {
     route::ProfileSource::Server => "byok",
     route::ProfileSource::Managed => "managed",
-    route::ProfileSource::Local => return Err(RuntimeError::invalid_state("embedding_route_unavailable")),
+    route::ProfileSource::Local | route::ProfileSource::ChatGPTPlan => {
+      return Err(RuntimeError::invalid_state("embedding_route_unavailable"));
+    }
   };
   let endpoint_fingerprint = hex::encode(Sha256::digest(format!("{:?}", profile.endpoint).as_bytes()));
   let identity = format!(
@@ -282,7 +286,15 @@ impl BackendRuntime {
     profiles: &[AuthorizedProviderProfile],
     candidates: &[AuthorizedTargetRef],
   ) -> RuntimeResult<HashMap<String, Zeroizing<String>>> {
-    resolve_managed_credentials(config, profiles, candidates, &self.managed_token_providers).await
+    let mut credentials =
+      resolve_managed_credentials(config, profiles, candidates, &self.managed_token_providers).await?;
+    for candidate in candidates {
+      if let CredentialRef::ChatGPTPlan { user_id, profile_id } = &profiles[candidate.profile_index].credential_ref {
+        let token = super::chatgpt::access_token(&self.pool().await?, config, user_id, profile_id).await?;
+        credentials.insert(profile_id.clone(), token);
+      }
+    }
+    Ok(credentials)
   }
 
   async fn authorize_copilot_route(
@@ -305,13 +317,20 @@ impl BackendRuntime {
         local_lease_id: input.local_lease_id.as_deref(),
         access: &input.access,
         managed_target_id: input.managed_target_id.as_deref(),
+        explicit_byok: input.target_override.is_some(),
       },
     )
     .await?;
     if input.managed_target_id.is_some() && input.target_override.is_some() {
       return Err(RuntimeError::invalid_input("multiple_target_selections"));
     }
-    let target_override = if let Some(target_id) = input.managed_target_id.as_deref() {
+    let chatgpt_target = input
+      .managed_target_id
+      .as_deref()
+      .filter(|id| id.starts_with("chatgpt:"));
+    let target_override = if let Some(target_id) = chatgpt_target {
+      Some(super::chatgpt::decode_target(target_id)?)
+    } else if let Some(target_id) = input.managed_target_id.as_deref() {
       let model_id =
         route::managed_selected_target(input.built_in_route_id.as_deref(), target_id, input.access.managed_tier)
           .ok_or_else(|| RuntimeError::invalid_input("managed_target_unavailable"))?;
@@ -332,15 +351,15 @@ impl BackendRuntime {
         model_id: target.model_id,
       })
     };
-    let candidates = match route::decide(route::RoutePolicyInput {
+    let mut candidates = match route::decide(route::RoutePolicyInput {
       slot: &slot,
       deployment: config.deployment,
-      byok_enabled: config.copilot.byok.enabled,
+      byok_enabled: config.copilot.byok.enabled || config.copilot.chatgpt_enabled,
       access_available: input.access.route_allowed
         || route::quota_policy(&slot, input.built_in_route_id.as_deref()) != route::QuotaPolicy::Metered,
       profiles: &profiles,
       target_override: target_override.as_ref(),
-      target_override_managed: input.managed_target_id.is_some(),
+      target_override_managed: input.managed_target_id.is_some() && chatgpt_target.is_none(),
     }) {
       route::RouteDecision::Ready(candidates) => candidates,
       route::RouteDecision::Denied(reason) => {
@@ -350,6 +369,12 @@ impl BackendRuntime {
         return Err(RuntimeError::invalid_state(reason_name(reason)));
       }
     };
+    if candidates
+      .first()
+      .is_some_and(|target| profiles[target.profile_index].source == route::ProfileSource::ChatGPTPlan)
+    {
+      candidates.truncate(1);
+    }
     Ok(AuthorizedCopilotRoute {
       config,
       slot,

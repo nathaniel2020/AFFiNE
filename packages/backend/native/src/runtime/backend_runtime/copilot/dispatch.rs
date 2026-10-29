@@ -5,7 +5,7 @@ use std::{
 
 use gcp_auth::{CustomServiceAccount, TokenProvider};
 use llm_adapter::{
-  backend::{BackendError, DefaultHttpClient},
+  backend::BackendError,
   capability::{AttachmentKind, AttachmentSource},
   core::{CoreContent, ImageInput, ImageRequest},
   router::{ExecutablePreparedRoute, ExecutableProtocol, ExecutableRequest, ExecutableResponse},
@@ -64,6 +64,7 @@ pub(super) struct CopilotExecutionResult {
 
 pub(super) struct CompiledExecution {
   pub(super) plan: CompiledPlan,
+  pub(super) chatgpt_plan: bool,
   identities: HashMap<String, RouteIdentity>,
 }
 
@@ -110,9 +111,11 @@ pub(super) fn execute(
 ) -> RuntimeResult<CopilotExecutionResult> {
   let execution = compile_execution(&config, slot, request, &profiles, &candidates, &managed_credentials)?;
   let mut runtime_events = Vec::new();
-  let response = dispatch_compiled_plan(&DefaultHttpClient::default(), &execution.plan, |event| {
-    runtime_events.push(event)
-  })
+  let response = dispatch_compiled_plan(
+    &super::chatgpt_http::CopilotHttpClient::new(execution.chatgpt_plan),
+    &execution.plan,
+    |event| runtime_events.push(event),
+  )
   .map_err(|error| RuntimeError::invalid_state(error.to_string()))?;
   let events = runtime_events
     .into_iter()
@@ -188,6 +191,7 @@ pub(super) fn compile_execution(
           crate::llm::route::ProfileSource::Server => "server",
           crate::llm::route::ProfileSource::Local => "local",
           crate::llm::route::ProfileSource::Managed => "affine_cloud",
+          crate::llm::route::ProfileSource::ChatGPTPlan => "chatgpt_plan",
         },
         provider: profile.provider.clone(),
         model: target.model.clone(),
@@ -199,6 +203,9 @@ pub(super) fn compile_execution(
     routes.push(CompiledRoute::new(route_id, route));
   }
   Ok(CompiledExecution {
+    chatgpt_plan: candidates
+      .iter()
+      .any(|candidate| profiles[candidate.profile_index].source == crate::llm::route::ProfileSource::ChatGPTPlan),
     plan: CompiledPlan::new(routes).map_err(|error| RuntimeError::invalid_state(error.to_string()))?,
     identities,
   })
@@ -285,7 +292,7 @@ fn resolve_credential(
         String::from_utf8(credential.expose().to_vec())
           .map_err(|_| RuntimeError::invalid_state("credential_unavailable"))
       }),
-    CredentialRef::Managed { profile_id } => managed_credentials
+    CredentialRef::Managed { profile_id } | CredentialRef::ChatGPTPlan { profile_id, .. } => managed_credentials
       .get(profile_id)
       .map(|credential| credential.as_str().to_string())
       .ok_or_else(|| RuntimeError::invalid_state("managed copilot credential unavailable")),
