@@ -597,7 +597,16 @@ export function createNodeTargetConfig(
       symlinks: true,
       extensionAlias: { '.js': ['.js', '.ts'], '.mjs': ['.mjs', '.mts'] },
       extensions: ['.js', '.ts', '.tsx', '.node'],
-      alias: { yjs: ProjectRoot.join('node_modules', 'yjs').value },
+      alias: {
+        yjs: ProjectRoot.join('node_modules', 'yjs').value,
+        ...(process.env.AFFINE_SERVER_NATIVE_SINGLE_ARCH === '1'
+          ? {
+              '@affine/server-native$': ProjectRoot.join(
+                'packages/backend/native/server-native.node'
+              ).value,
+            }
+          : {}),
+      },
     },
     module: {
       parser: {

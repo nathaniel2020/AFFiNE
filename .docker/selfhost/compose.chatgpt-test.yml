@@ -1,0 +1,50 @@
+# Standalone acceptance environment. Does not share production ports or volumes.
+name: affine-siwc-acceptance
+services:
+  affine:
+    image: ${AFFINE_CHATGPT_IMAGE:-affine-chatgpt:local}
+    pull_policy: never
+    container_name: affine_siwc_acceptance
+    ports: ['127.0.0.1:13010:3010']
+    environment: &environment
+      DEPLOYMENT_TYPE: selfhosted
+      DATABASE_URL: postgresql://affine:isolated-test-only@postgres:5432/affine
+      REDIS_SERVER_HOST: redis
+    volumes: &volumes
+      - config:/root/.affine/config
+      - storage:/root/.affine/storage
+    depends_on:
+      migration: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+  migration:
+    image: ${AFFINE_CHATGPT_IMAGE:-affine-chatgpt:local}
+    pull_policy: never
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    environment: *environment
+    volumes: *volumes
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: affine
+      POSTGRES_PASSWORD: isolated-test-only
+      POSTGRES_DB: affine
+    volumes: ['database:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'affine', '-d', 'affine']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  database:
+  storage:
+  config:

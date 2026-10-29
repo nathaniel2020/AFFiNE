@@ -1,0 +1,8 @@
+# Use only after backup and isolated acceptance. Apply to your own base Compose.
+services:
+  affine:
+    image: ${AFFINE_CHATGPT_IMAGE:-affine-chatgpt:local}
+    pull_policy: never
+  affine_migration:
+    image: ${AFFINE_CHATGPT_IMAGE:-affine-chatgpt:local}
+    pull_policy: never

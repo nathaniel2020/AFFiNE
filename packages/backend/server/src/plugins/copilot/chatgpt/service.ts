@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
+import { BadRequest } from '../../../base';
 import { BackendRuntimeProvider } from '../../../core/backend-runtime';
 
 export interface ChatgptProfile {
@@ -51,7 +52,7 @@ export class ChatgptService {
     try {
       return await this.backend.chatgptCommand(userId, command);
     } catch {
-      throw new BadRequestException(
+      throw new BadRequest(
         'ChatGPT connection update failed; check the selected connection and try again.'
       );
     }
@@ -70,7 +71,7 @@ export class ChatgptService {
       choices: profiles.flatMap(profile =>
         profile.models.map(model => ({
           id: chatgptTargetId(profile.id, model.slug),
-          displayName: `ChatGPT ${model.displayName} · ${profile.email || profile.id.slice(0, 8)}`,
+          displayName: `ChatGPT ${model.displayName} · ${profile.email || 'Account'} · ${profile.id.slice(0, 8)}`,
           minimumTier: 'Standard',
           available: true,
         }))

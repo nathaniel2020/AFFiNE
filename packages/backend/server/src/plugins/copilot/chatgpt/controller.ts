@@ -1,13 +1,7 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { z } from 'zod';
 
-import { Throttle } from '../../../base';
+import { BadRequest, Throttle } from '../../../base';
 import { CurrentUser } from '../../../core/auth';
 import { ChatgptService } from './service';
 
@@ -32,8 +26,7 @@ export class ChatgptController {
   @Post()
   async update(@CurrentUser() user: CurrentUser, @Body() body: unknown) {
     const parsed = commandSchema.safeParse(body);
-    if (!parsed.success)
-      throw new BadRequestException('Invalid ChatGPT operation');
+    if (!parsed.success) throw new BadRequest('Invalid ChatGPT operation');
     return await this.chatgpt.command(user.id, parsed.data);
   }
 }

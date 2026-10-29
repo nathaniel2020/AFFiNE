@@ -1,7 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
 import test from 'ava';
 import Sinon from 'sinon';
 
+import { BadRequest } from '../../../base';
 import type { CurrentUser } from '../../../core/auth';
 import type { BackendRuntimeProvider } from '../../../core/backend-runtime';
 import { ChatgptController } from './controller';
@@ -45,7 +45,7 @@ test('Web projection and old desktop route shape contain no registration metadat
     choices: [
       {
         id: chatgptTargetId(id, 'dynamic-model'),
-        displayName: 'ChatGPT Dynamic · personal@example.test',
+        displayName: 'ChatGPT Dynamic · personal@example.test · 57128a30',
         minimumTier: 'Standard',
         available: true,
       },
@@ -69,7 +69,7 @@ test('HTTP management rejects token import and binds every operation to current 
       action: 'import',
       record: { access_token: 'do-not-accept' },
     }),
-    { instanceOf: BadRequestException }
+    { instanceOf: BadRequest }
   );
   await t.throwsAsync(
     controller.update(user, {
@@ -77,7 +77,7 @@ test('HTTP management rejects token import and binds every operation to current 
       profileId: id,
       userId: 'user-b',
     }),
-    { instanceOf: BadRequestException }
+    { instanceOf: BadRequest }
   );
   t.false(command.called);
   await controller.update(user, {
@@ -100,7 +100,8 @@ test('runtime error details never leak through the management API', async t => {
     chatgptCommand,
   } as unknown as BackendRuntimeProvider);
   const error = await t.throwsAsync(
-    service.command('user', { action: 'disconnect', profileId: id })
+    service.command('user', { action: 'disconnect', profileId: id }),
+    { instanceOf: BadRequest }
   );
   t.false(error?.message.includes('sensitive fixture'));
 });

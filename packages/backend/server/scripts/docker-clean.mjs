@@ -384,6 +384,7 @@ async function pruneServerNative(distDir, keepArch) {
       if (
         name.startsWith('server-native.') &&
         name.endsWith('.node') &&
+        name !== 'server-native.node' &&
         name !== keepName
       ) {
         await fs.rm(path.join(distDir, name), { force: true }).catch(() => {});
