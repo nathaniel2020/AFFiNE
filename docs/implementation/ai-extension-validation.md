@@ -5,7 +5,7 @@
 ## 构建和自动测试
 
 - Node 22.23.2；扩展独立 TypeScript 类型检查通过。
-- 网关自动测试 15 项通过，共享本机 OAuth 测试 8 项通过。
+- 网关自动测试 16 项通过，共享本机 OAuth 测试 8 项通过。
 - 前端 ChatGPT/BYOK/集成设置及管理员配置测试共 20 项通过。
 - frontend/core、admin、tools/cli TypeScript build 检查通过；oxlint 和 diff whitespace 检查通过。
 - 网关镜像独立构建、健康检查通过，无宿主端口映射。

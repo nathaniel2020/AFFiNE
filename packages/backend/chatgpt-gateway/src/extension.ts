@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import { signIn } from './oauth.mjs';
-import { configureAffine } from './setup.ts';
+import { configureAffine, gatewayReady } from './setup.ts';
 import type { Json } from './types.ts';
 import { atomicWrite } from './util.ts';
 
@@ -237,6 +237,8 @@ async function main() {
       (action === 'configure' && !values.workspace)
     )
       throw new Error('Specify --server, --credentials-file and --workspace.');
+    if (action === 'rollback' && !values.rollback)
+      throw new Error('Specify --rollback BACKUP_FILE.');
     await configureAffine({
       server: values.server,
       workspace: values.workspace,
@@ -249,7 +251,7 @@ async function main() {
           : undefined,
       gatewayReady:
         action === 'configure'
-          ? !!(await command({ action: 'status' })).selected
+          ? gatewayReady(await command({ action: 'status' }))
           : false,
     });
     return;

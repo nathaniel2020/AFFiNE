@@ -40,6 +40,21 @@ export function textCandidates(profiles: Json[]) {
       )
   );
 }
+export function gatewayReady(status: Json) {
+  const selected = status.selected;
+  const profile = status.profiles.find(
+    (p: Json) => p.id === selected?.profileId
+  );
+  return !!(
+    status.enabled &&
+    selected &&
+    profile?.status === 'connected' &&
+    profile.models.some((model: Json) => model.slug === selected.model) &&
+    ['text', 'structured', 'tools'].every(capability =>
+      profile.verified[selected.model]?.includes(capability)
+    )
+  );
+}
 export const gatewayDefinition = {
   endpoint: {
     kind: 'openai_compatible',

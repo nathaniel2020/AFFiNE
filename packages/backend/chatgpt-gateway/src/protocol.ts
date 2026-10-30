@@ -237,6 +237,16 @@ export class Continuations {
         'continuation_mismatch',
         'Tool context belongs to a different connection or model.'
       );
+    if (
+      input.some(
+        item =>
+          item.type === 'function_call' && !chain.aliases.has(item.call_id)
+      )
+    )
+      return fail(
+        'continuation_mismatch',
+        'Tool calls belong to different conversation chains.'
+      );
     if (chain.inFlight)
       return fail(
         'continuation_busy',

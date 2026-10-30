@@ -14,7 +14,7 @@ import {
   Responses,
 } from '../src/protocol.ts';
 import { startGateway } from '../src/server.ts';
-import { textCandidates } from '../src/setup.ts';
+import { gatewayReady, textCandidates } from '../src/setup.ts';
 import { Store } from '../src/store.ts';
 import type { Json, Profile, Session } from '../src/types.ts';
 import { GatewayError } from '../src/util.ts';
@@ -287,6 +287,13 @@ await test('concurrent conversation chains cannot be mixed and restart loses onl
   await assert.rejects(
     mock.responses.run({ model: 'chatgpt-default', input }, session),
     /mixed/
+  );
+  await assert.rejects(
+    mock.responses.run(
+      { model: 'chatgpt-default', input: [input[0], b.output[0]] },
+      session
+    ),
+    /different conversation chains/
   );
   mock.responses.continuations.clear();
   await assert.rejects(
@@ -571,4 +578,22 @@ await test('setup identifies text candidates without treating image-only provide
     },
   });
   assert.equal(textCandidates([p('image'), p('text'), p('object')]).length, 2);
+});
+
+await test('setup requires an enabled, connected and fully verified selection before changing AFFiNE', () => {
+  const state = {
+    enabled: true,
+    selected: { profileId: 'profile-1', model: 'test-model' },
+    profiles: [profile()],
+  };
+  assert.equal(gatewayReady(state), true);
+  assert.equal(gatewayReady({ ...state, enabled: false }), false);
+  state.profiles[0].status = 'signed_out';
+  assert.equal(gatewayReady(state), false);
+  state.profiles[0] = profile();
+  state.profiles[0].verified['test-model'] = ['text', 'tools'];
+  assert.equal(gatewayReady(state), false);
+  state.profiles[0] = profile();
+  state.profiles[0].models = [];
+  assert.equal(gatewayReady(state), false);
 });
