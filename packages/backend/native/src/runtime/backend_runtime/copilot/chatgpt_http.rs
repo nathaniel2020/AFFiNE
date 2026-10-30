@@ -1,4 +1,7 @@
-use std::cell::RefCell;
+use std::{
+  cell::RefCell,
+  collections::{BTreeMap, HashMap},
+};
 
 use llm_adapter::backend::{BackendError, BackendHttpClient, DefaultHttpClient, HttpBody, HttpRequest, HttpResponse};
 use serde_json::{Value, json};
@@ -182,6 +185,8 @@ fn normalize(body: &mut Value) -> Result<(), BackendError> {
 struct CompletionGuard {
   buffer: String,
   completed: Option<Value>,
+  output_items: BTreeMap<u64, Value>,
+  tool_call_ids: HashMap<String, String>,
 }
 
 impl CompletionGuard {
@@ -201,7 +206,7 @@ impl CompletionGuard {
       if data.is_empty() || data == "[DONE]" {
         continue;
       }
-      let event: Value = serde_json::from_str(&data).map_err(|_| failure("invalid SSE event"))?;
+      let mut event: Value = serde_json::from_str(&data).map_err(|_| failure("invalid SSE event"))?;
       if self.completed.is_some() {
         return Err(failure("event after completion"));
       }
@@ -219,11 +224,52 @@ impl CompletionGuard {
           if self.completed.is_some() || !event["response"].is_object() {
             return Err(failure("invalid completion event"));
           }
+          // Some SIWC streams finalize each output item separately and leave
+          // response.completed.output empty. Retain the finalized items (including
+          // encrypted reasoning) for both tool replay and structured decoding.
+          let output = event["response"]["output"]
+            .as_array_mut()
+            .ok_or_else(|| failure("invalid completion output"))?;
+          if output.is_empty() && !self.output_items.is_empty() {
+            if self.output_items.keys().copied().ne(0..self.output_items.len() as u64) {
+              return Err(failure("stream is missing finalized output items"));
+            }
+            output.extend(self.output_items.values().cloned());
+          }
           self.completed = Some(event["response"].clone());
+        }
+        "response.output_item.added" | "response.output_item.done" => {
+          let item = &event["item"];
+          if item["type"] == "function_call" {
+            let id = item["id"].as_str().ok_or_else(|| failure("missing tool item ID"))?;
+            let call_id = item["call_id"]
+              .as_str()
+              .ok_or_else(|| failure("missing tool call ID"))?;
+            self.tool_call_ids.insert(id.into(), call_id.into());
+          }
+          if event["type"] == "response.output_item.done" {
+            let index = event["output_index"]
+              .as_u64()
+              .ok_or_else(|| failure("missing output index"))?;
+            if !item.is_object() || self.output_items.insert(index, item.clone()).is_some() {
+              return Err(failure("invalid finalized output item"));
+            }
+          }
+        }
+        "response.function_call_arguments.delta" | "response.function_call_arguments.done" => {
+          // The generic adapter expects call_id, while Responses argument events
+          // reference the output item's ID. Resolve it before feeding that parser.
+          if let Some(item_id) = event["item_id"].as_str() {
+            let call_id = self
+              .tool_call_ids
+              .get(item_id)
+              .ok_or_else(|| failure("unknown tool item ID"))?;
+            event["call_id"] = json!(call_id);
+          }
         }
         _ => {}
       }
-      frames.push(frame);
+      frames.push(format!("data: {event}\n\n"));
     }
     Ok(frames)
   }
@@ -316,6 +362,111 @@ mod tests {
     assert_eq!(history[2], call);
     assert_eq!(history[4], second_call);
     assert_eq!(history[5]["output"], "edited");
+  }
+  #[test]
+  fn sparse_completion_replays_parallel_tools_using_item_ids() {
+    use llm_adapter::{
+      core::StreamEvent,
+      stream::{OpenaiResponsesStreamParser, SseFrameDecoder},
+    };
+
+    let reasoning = json!({"type":"reasoning","id":"rs_1","encrypted_content":"opaque","summary":[]});
+    let calls = [
+      json!({"type":"function_call","id":"fc_1","call_id":"call_1","name":"read_doc","arguments":"{\"doc\":\"A\"}"}),
+      json!({"type":"function_call","id":"fc_2","call_id":"call_2","name":"read_doc","arguments":"{\"doc\":\"B\"}"}),
+    ];
+    let frame = |event: Value| format!("data: {event}\n\n");
+    let mut frames = vec![frame(
+      json!({"type":"response.output_item.done","output_index":0,"item":reasoning}),
+    )];
+    for (index, call) in calls.iter().enumerate() {
+      let mut added = call.clone();
+      added["arguments"] = json!("");
+      frames.push(frame(
+        json!({"type":"response.output_item.added","output_index":index+1,"item":added}),
+      ));
+    }
+    // Argument streams may be interleaved and do not carry call_id or name.
+    for call in &calls {
+      frames.push(frame(
+        json!({"type":"response.function_call_arguments.delta","item_id":call["id"],"delta":call["arguments"]}),
+      ));
+    }
+    for (index, call) in calls.iter().enumerate() {
+      frames.push(frame(
+        json!({"type":"response.function_call_arguments.done","item_id":call["id"],"arguments":call["arguments"]}),
+      ));
+      frames.push(frame(
+        json!({"type":"response.output_item.done","output_index":index+1,"item":call}),
+      ));
+    }
+    frames.push(completed(json!([])));
+    let client = client(vec![frames, vec![completed(json!([]))]]);
+    let mut decoder = SseFrameDecoder::default();
+    let mut parser = OpenaiResponsesStreamParser::default();
+    let mut events = Vec::new();
+    client
+      .post_sse(
+        request(json!([{"role":"user","content":"read A and B"}])),
+        &mut |chunk| {
+          for frame in decoder.push_chunk(chunk) {
+            events.extend(parser.push_frame(frame).unwrap());
+          }
+          Ok(())
+        },
+      )
+      .unwrap();
+    events.extend(parser.finish());
+    let executed = events
+      .iter()
+      .filter_map(|event| match event {
+        StreamEvent::ToolCall { call_id, arguments, .. } => Some((call_id.as_str(), arguments.clone())),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+    assert_eq!(
+      executed,
+      vec![("call_1", json!({"doc":"A"})), ("call_2", json!({"doc":"B"}))]
+    );
+    client
+      .post_sse(
+        request(json!([
+          {"type":"function_call_output","call_id":"call_1","output":"A"},
+          {"type":"function_call_output","call_id":"call_2","output":"B"}
+        ])),
+        &mut |_| Ok(()),
+      )
+      .unwrap();
+    let requests = client.inner.requests.borrow();
+    let history = requests[1]["input"].as_array().unwrap();
+    assert_eq!(history.len(), 6);
+    assert_eq!(history[1], reasoning);
+    assert_eq!(history[2], calls[0]);
+    assert_eq!(history[3], calls[1]);
+    assert_eq!(history[4]["call_id"], "call_1");
+    assert_eq!(history[5]["call_id"], "call_2");
+  }
+  #[test]
+  fn sparse_structured_completion_retains_text_and_still_requires_completion() {
+    let item = json!({"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"{\"title\":\"ok\"}"}]});
+    let done = format!(
+      "data: {}\n\n",
+      json!({"type":"response.output_item.done","output_index":0,"item":item})
+    );
+    let client = client(vec![vec![done.clone(), completed(json!([]))]]);
+    let response = client.post_json(request(json!([]))).unwrap();
+    assert_eq!(response.body["output"], json!([item]));
+    let mut truncated = CompletionGuard::default();
+    truncated.push(&done).unwrap();
+    assert!(truncated.finish().is_err());
+    let mut missing = CompletionGuard::default();
+    missing
+      .push(&format!(
+        "data: {}\n\n",
+        json!({"type":"response.output_item.done","output_index":1,"item":item})
+      ))
+      .unwrap();
+    assert!(missing.push(&completed(json!([]))).is_err());
   }
   #[test]
   fn structured_and_attachment_requests_use_streamed_completion() {
