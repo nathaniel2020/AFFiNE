@@ -1,0 +1,23 @@
+{
+  "name": "@affine/chatgpt-gateway",
+  "version": "0.27.5",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0 <23.0.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --experimental-transform-types --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "start": "node dist/server.mjs"
+  },
+  "dependencies": {
+    "jose": "^6.1.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.1",
+    "typescript": "npm:@typescript/typescript6@6.0.2"
+  }
+}

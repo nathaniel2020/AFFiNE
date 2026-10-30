@@ -1,7 +1,11 @@
 import { SettingHeader } from '@affine/component/setting-components';
 import { useWorkspaceInfo } from '@affine/core/components/hooks/use-workspace-info';
-import { ServerService } from '@affine/core/modules/cloud';
+import {
+  ServerService,
+  WorkspaceServerService,
+} from '@affine/core/modules/cloud';
 import { WorkspaceService } from '@affine/core/modules/workspace';
+import { ServerDeploymentType } from '@affine/graphql';
 import { useI18n } from '@affine/i18n';
 import { useLiveData, useService } from '@toeverything/infra';
 import {
@@ -34,9 +38,19 @@ export const IntegrationSetting = ({
   const workspaceService = useService(WorkspaceService);
   const serverService = useService(ServerService);
   const serverFeatures = useLiveData(serverService.server.features$);
+  const workspaceServer = useLiveData(
+    useService(WorkspaceServerService).server$
+  );
+  const workspaceServerConfig = useLiveData(workspaceServer?.config$);
+  const hideWebAiSettings =
+    BUILD_CONFIG.isWeb &&
+    workspaceServerConfig?.type === ServerDeploymentType.Selfhosted;
   const info = useWorkspaceInfo(workspaceService.workspace);
   const isCloudWorkspace = workspaceService.workspace.flavour !== 'local';
-  const showByok = isCloudWorkspace && !!(info?.isOwner || info?.isAdmin);
+  const showByok =
+    isCloudWorkspace &&
+    !hideWebAiSettings &&
+    !!(info?.isOwner || info?.isAdmin);
 
   const integrationList = useMemo(
     () =>
@@ -79,7 +93,7 @@ export const IntegrationSetting = ({
           </>
         }
       />
-      {isCloudWorkspace ? <ChatgptSetting /> : null}
+      {isCloudWorkspace && !hideWebAiSettings ? <ChatgptSetting /> : null}
       <ul className={list}>
         {integrationList.map(item => {
           const title =

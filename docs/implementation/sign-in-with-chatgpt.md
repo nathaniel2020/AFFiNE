@@ -1,5 +1,7 @@
 # Sign in with ChatGPT for personal self-hosted AFFiNE
 
+For new installations, use the [independent AI extension](../../packages/backend/chatgpt-gateway/README.md). It runs in a separate Docker service, manages accounts through a CLI, and uses existing backend BYOK with official Canary set to Auto. The implementation below is retained for migration and rollback; its self-hosted Web workspace configuration card is now hidden. Do not copy its refresh token into the extension.
+
 This branch adds an **optional built-in server provider**, `chatgpt_plan`. It is intended for one person using their own ChatGPT accounts with their own AFFiNE Docker server. It is not a marketplace extension or a shared subscription gateway. The official desktop app remains installed unchanged; account management happens in the self-hosted Web app.
 
 ## Implementation

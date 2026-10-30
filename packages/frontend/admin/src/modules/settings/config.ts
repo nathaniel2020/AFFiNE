@@ -124,8 +124,9 @@ export const KNOWN_CONFIG_GROUPS = [
     fields: [
       {
         key: 'enabled',
-        desc: 'Enable AI features. Workspace owners configure provider keys in Workspace Settings → Integrations → AI BYOK.',
+        desc: 'Enable AI features. On self-hosted servers, manage provider keys in the desktop client or background AI extension.',
       },
+      'chatgptEnabled',
       'byok.enabled',
       'byok.allowedProviders',
       'byok.allowCustomEndpoint',

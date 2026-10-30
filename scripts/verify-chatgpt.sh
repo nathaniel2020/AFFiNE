@@ -13,6 +13,8 @@ node --test packages/backend/server/scripts/chatgpt/oauth.test.mjs
 yarn affine @affine/server test src/plugins/copilot/chatgpt/chatgpt.spec.ts
 yarn vitest run \
   packages/frontend/core/src/desktop/dialogs/setting/workspace-setting/chatgpt/panel.spec.tsx \
+  packages/frontend/core/src/desktop/dialogs/setting/workspace-setting/integration/index.spec.tsx \
+  packages/frontend/admin/src/modules/settings/ai-config.spec.ts \
   packages/frontend/core/src/desktop/dialogs/setting/workspace-setting/byok/index.spec.tsx
 yarn tsc -b packages/backend/server packages/frontend/core tools/cli --pretty false
 

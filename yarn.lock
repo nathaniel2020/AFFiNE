@@ -272,6 +272,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@affine/chatgpt-gateway@workspace:packages/backend/chatgpt-gateway":
+  version: 0.0.0-use.local
+  resolution: "@affine/chatgpt-gateway@workspace:packages/backend/chatgpt-gateway"
+  dependencies:
+    "@types/node": "npm:^22.0.0"
+    esbuild: "npm:^0.28.1"
+    jose: "npm:^6.1.3"
+    typescript: "npm:@typescript/typescript6@6.0.2"
+  languageName: unknown
+  linkType: soft
+
 "@affine/commitlint-config@workspace:tools/commitlint":
   version: 0.0.0-use.local
   resolution: "@affine/commitlint-config@workspace:tools/commitlint"

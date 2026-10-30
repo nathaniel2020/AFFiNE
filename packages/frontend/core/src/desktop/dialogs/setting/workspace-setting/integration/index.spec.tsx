@@ -21,6 +21,10 @@ const serverFeatures = vi.hoisted(() => ({ copilot: true }));
 
 const WorkspaceServiceToken = vi.hoisted(() => class WorkspaceService {});
 const ServerServiceToken = vi.hoisted(() => class ServerService {});
+const WorkspaceServerServiceToken = vi.hoisted(
+  () => class WorkspaceServerService {}
+);
+const deployment = vi.hoisted(() => ({ type: 'Affine' }));
 
 vi.mock('@affine/component/setting-components', () => ({
   SettingHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
@@ -40,6 +44,7 @@ vi.mock('@affine/core/modules/workspace', () => ({
 
 vi.mock('@affine/core/modules/cloud', () => ({
   ServerService: ServerServiceToken,
+  WorkspaceServerService: WorkspaceServerServiceToken,
 }));
 
 vi.mock('@affine/i18n', () => {
@@ -76,7 +81,7 @@ vi.mock('@blocksuite/icons/rc', () => ({
 }));
 
 vi.mock('@toeverything/infra', () => ({
-  useLiveData: () => serverFeatures,
+  useLiveData: (value: unknown) => value,
   useService: (token: unknown) => {
     if (token === WorkspaceServiceToken) {
       return {
@@ -86,12 +91,19 @@ vi.mock('@toeverything/infra', () => ({
     if (token === ServerServiceToken) {
       return { server: { features$: serverFeatures } };
     }
+    if (token === WorkspaceServerServiceToken) {
+      return { server$: { config$: deployment } };
+    }
     return {};
   },
 }));
 
 vi.mock('../byok', () => ({
   WorkspaceByokSetting: () => null,
+}));
+
+vi.mock('../chatgpt', () => ({
+  ChatgptSetting: () => <div>ChatGPT settings</div>,
 }));
 
 vi.mock('../../sub-page', () => ({
@@ -122,10 +134,13 @@ describe('IntegrationSetting', () => {
     };
     workspaceState.flavour = 'affine';
     serverFeatures.copilot = true;
+    deployment.type = 'Affine';
+    vi.stubGlobal('BUILD_CONFIG', { isWeb: true });
   });
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   const byokVisibilityCases = [
@@ -179,5 +194,17 @@ describe('IntegrationSetting', () => {
     expect(
       screen.getByText('com.affine.integration.mcp-server.name')
     ).not.toBeNull();
+  });
+
+  test('hides workspace AI settings only on the self-hosted web surface', () => {
+    workspaceInfoState.info.isOwner = true;
+    deployment.type = 'Selfhosted';
+    const { rerender } = render(<IntegrationSetting />);
+    expect(screen.queryByText('AI BYOK')).toBeNull();
+    expect(screen.queryByText('ChatGPT settings')).toBeNull();
+    vi.stubGlobal('BUILD_CONFIG', { isWeb: false });
+    rerender(<IntegrationSetting />);
+    expect(screen.getByText('AI BYOK')).not.toBeNull();
+    expect(screen.getByText('ChatGPT settings')).not.toBeNull();
   });
 });

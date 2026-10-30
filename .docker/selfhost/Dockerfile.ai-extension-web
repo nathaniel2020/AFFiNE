@@ -1,0 +1,6 @@
+# Only replace Web/admin assets in an already compatible AFFiNE backend image.
+# This image is optional and is never loaded by the independent AI extension.
+ARG AFFINE_BASE_IMAGE=affine-chatgpt:local
+FROM ${AFFINE_BASE_IMAGE}
+COPY packages/frontend/apps/web/dist/ /app/static/
+COPY packages/frontend/admin/dist/ /app/static/admin/

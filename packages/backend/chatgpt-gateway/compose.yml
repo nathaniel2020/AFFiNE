@@ -1,0 +1,38 @@
+name: affine-ai-extension
+services:
+  gateway:
+    image: ${GATEWAY_IMAGE:-affine-chatgpt-gateway:local}
+    pull_policy: never
+    container_name: ${GATEWAY_CONTAINER:-affine_ai_extension}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: '1000:1000'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /run/gateway:uid=1000,gid=1000,mode=0700
+    volumes:
+      - state:/data
+      - keys:/keys
+    networks:
+      affine:
+        aliases: [affine-ai-extension]
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+networks:
+  affine:
+    external: true
+    name: ${AFFINE_NETWORK:?Set AFFINE_NETWORK to the existing AFFiNE Docker network}
+volumes:
+  state:
+  keys:

@@ -1,0 +1,4 @@
+**
+!packages/frontend/apps/web/dist/**
+!packages/frontend/admin/dist/**
+**/*.map
